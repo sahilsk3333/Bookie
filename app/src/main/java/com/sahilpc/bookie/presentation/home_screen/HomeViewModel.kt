@@ -19,6 +19,9 @@ import com.sahilpc.bookie.domain.repository.AuthRepository
 import com.sahilpc.bookie.domain.repository.NoteRepository
 import com.sahilpc.bookie.presentation.signin_screen.SignInViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -29,7 +32,9 @@ class HomeViewModel @Inject constructor(
     private val app: Application
 ) : ViewModel() {
 
-    var notesList = MutableLiveData<List<Note>>()
+    private val _notesList = MutableStateFlow<List<Note>>(emptyList())
+    val notesList = _notesList.asStateFlow()
+
     var imageUri: Uri? = null
     var isLoggedIn = MutableLiveData(true)
 
@@ -46,15 +51,16 @@ class HomeViewModel @Inject constructor(
                 Toast.makeText(app, "Something went wrong", Toast.LENGTH_SHORT).show()
                 return@launch
             }
-            getAllNotes()
+//            getAllNotes()
             Toast.makeText(app, "Note is Inserted", Toast.LENGTH_SHORT).show()
         }
     }
 
-     fun getAllNotes() {
+    private fun getAllNotes() {
         viewModelScope.launch {
-            val result = noteRepository.getAllNotes()
-            notesList.postValue(result)
+            noteRepository.getAllNotes().collectLatest {
+                _notesList.value = it
+            }
         }
     }
 

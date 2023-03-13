@@ -34,6 +34,7 @@ import com.sahilpc.bookie.domain.model.Note
 import com.sahilpc.bookie.presentation.MainActivity
 import com.sahilpc.bookie.presentation.signin_screen.SignInViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -83,11 +84,11 @@ class HomeFragment : Fragment() {
             if (!it) findNavController().navigate(HomeFragmentDirections.actionHomeFragmentToSignInFragment())
         }
 
-        viewModel.notesList.observe(viewLifecycleOwner, Observer { noteList ->
-            noteList?.let { noteList ->
-                homeAdapter.differ.submitList(noteList)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.notesList.collectLatest { notesList ->
+                homeAdapter.differ.submitList(notesList)
             }
-        })
+        }
 
     }
 
