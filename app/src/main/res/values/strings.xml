@@ -24,4 +24,5 @@
     <string name="add">add</string>
     <string name="add_note">Add Note</string>
     <string name="details">Details</string>
+    <string name="export_to_pdf">Export to Pdf</string>
 </resources>

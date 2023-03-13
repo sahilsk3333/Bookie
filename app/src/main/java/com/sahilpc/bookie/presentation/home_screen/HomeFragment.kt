@@ -3,40 +3,36 @@ package com.sahilpc.bookie.presentation.home_screen
 import android.app.Activity
 import android.app.Dialog
 import android.graphics.Bitmap
-import android.icu.number.NumberFormatter.with
-import android.icu.number.NumberRangeFormatter.with
+import android.graphics.pdf.PdfDocument
+import android.graphics.pdf.PdfDocument.PageInfo
 import android.os.Bundle
+import android.os.storage.StorageManager
 import android.provider.MediaStore
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ImageView
-import android.widget.Toast
+import android.widget.*
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat.getSystemService
 import androidx.databinding.DataBindingUtil
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
-import at.favre.lib.crypto.bcrypt.BCrypt.with
-import com.google.android.gms.cast.framework.media.ImagePicker
 import com.sahilpc.bookie.R
-import com.sahilpc.bookie.data.local.datastore.AuthDatastore
 import com.sahilpc.bookie.databinding.FragmentHomeBinding
 import com.sahilpc.bookie.domain.model.Note
-import com.sahilpc.bookie.presentation.MainActivity
-import com.sahilpc.bookie.presentation.signin_screen.SignInViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import javax.inject.Inject
+
 
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
@@ -76,18 +72,32 @@ class HomeFragment : Fragment() {
             showDialog()
         }
 
-        homeAdapter.setOnItemClickListener {note ->
-            findNavController().navigate(HomeFragmentDirections.actionHomeFragmentToDetailsFragment(note))
+        homeAdapter.setOnItemClickListener { note ->
+            findNavController().navigate(
+                HomeFragmentDirections.actionHomeFragmentToDetailsFragment(
+                    note
+                )
+            )
         }
 
-        viewModel.isLoggedIn.observe(viewLifecycleOwner){
+        viewModel.isLoggedIn.observe(viewLifecycleOwner) {
             if (!it) findNavController().navigate(HomeFragmentDirections.actionHomeFragmentToSignInFragment())
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.notesList.collectLatest { notesList ->
+                if (notesList.isEmpty()) {
+                    binding.btnExportPdf.visibility = View.GONE
+                } else {
+                    binding.btnExportPdf.visibility = View.VISIBLE
+                }
+
                 homeAdapter.differ.submitList(notesList)
             }
+        }
+
+        binding.btnExportPdf.setOnClickListener {
+            printPdf()
         }
 
     }
@@ -127,9 +137,9 @@ class HomeFragment : Fragment() {
                 viewModel.imageUri
             )
             if (title.length < 5) {
-                noteTitle.setError("too short")
+                noteTitle.error = "too short"
             } else if (des.length < 100) {
-                noteDescription.setError("Must have more then 100 Characters")
+                noteDescription.error = "Must have more then 100 Characters"
             } else {
                 viewModel.insertNote(
                     Note(
@@ -158,21 +168,54 @@ class HomeFragment : Fragment() {
             val resultCode = result.resultCode
             val data = result.data
 
-            if (resultCode == Activity.RESULT_OK) {
-                //Image Uri will not be null for RESULT_OK
-                val fileUri = data?.data!!
-                viewModel.imageUri = fileUri
+            when (resultCode) {
+                Activity.RESULT_OK -> {
+                    //Image Uri will not be null for RESULT_OK
+                    val fileUri = data?.data!!
+                    viewModel.imageUri = fileUri
 
-            } else if (resultCode == com.github.dhaval2404.imagepicker.ImagePicker.RESULT_ERROR) {
-                Toast.makeText(
-                    requireActivity(),
-                    com.github.dhaval2404.imagepicker.ImagePicker.getError(data),
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                Toast.makeText(requireActivity(), "Task Cancelled", Toast.LENGTH_SHORT).show()
+                }
+                com.github.dhaval2404.imagepicker.ImagePicker.RESULT_ERROR -> {
+                    Toast.makeText(
+                        requireActivity(),
+                        com.github.dhaval2404.imagepicker.ImagePicker.getError(data),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                else -> {
+                    Toast.makeText(requireActivity(), "Task Cancelled", Toast.LENGTH_SHORT).show()
+                }
             }
         }
+
+    @Throws(IOException::class)
+    fun printPdf() {
+        try {
+            val storageManager =
+                getSystemService(requireActivity().applicationContext, StorageManager::class.java)
+            val storageVolume = storageManager!!.storageVolumes[0] // internal memory/ storage
+
+            val filePDFOutput = File(storageVolume.directory?.path + "/Download/Bookie.pdf");
+            val pdfDocument = PdfDocument()
+            val pageInfo = PageInfo.Builder(
+                binding.homeRv.width,
+                binding.homeRv.height,
+                1
+            ).create()
+            val page = pdfDocument.startPage(pageInfo)
+            binding.homeRv.draw(page.canvas)
+            pdfDocument.finishPage(page)
+            pdfDocument.writeTo(FileOutputStream(filePDFOutput))
+            pdfDocument.close()
+
+            Toast.makeText(requireContext(), "Pdf saved to downloads folder", Toast.LENGTH_SHORT)
+                .show()
+
+        } catch (e: Exception) {
+            println(e.stackTrace)
+        }
+
+    }
 
 
 }
