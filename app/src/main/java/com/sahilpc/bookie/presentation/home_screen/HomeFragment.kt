@@ -208,7 +208,7 @@ class HomeFragment : Fragment() {
 
 
             val inflater = LayoutInflater.from(context)
-            val view = inflater.inflate(R.layout.home_rv_item, null)
+            val view = inflater.inflate(R.layout.fragment_details, null)
 
             val head = view.findViewById<TextView>(R.id.head)
             val subhead = view.findViewById<TextView>(R.id.subhead)
