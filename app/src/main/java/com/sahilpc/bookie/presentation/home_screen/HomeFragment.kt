@@ -3,11 +3,15 @@ package com.sahilpc.bookie.presentation.home_screen
 import android.app.Activity
 import android.app.Dialog
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfDocument.PageInfo
+import android.os.Build
 import android.os.Bundle
 import android.os.storage.StorageManager
 import android.provider.MediaStore
+import android.util.DisplayMetrics
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -190,31 +194,90 @@ class HomeFragment : Fragment() {
 
     @Throws(IOException::class)
     fun printPdf() {
+
         try {
+
             val storageManager =
                 getSystemService(requireActivity().applicationContext, StorageManager::class.java)
             val storageVolume = storageManager!!.storageVolumes[0] // internal memory/ storage
 
             val filePDFOutput = File(storageVolume.directory?.path + "/Download/Bookie.pdf");
             val pdfDocument = PdfDocument()
-            val pageInfo = PageInfo.Builder(
-                binding.homeRv.width,
-                binding.homeRv.height,
-                1
-            ).create()
-            val page = pdfDocument.startPage(pageInfo)
-            binding.homeRv.draw(page.canvas)
-            pdfDocument.finishPage(page)
+
+            val listOfNotes = viewModel.notesList.value
+
+
+            val inflater = LayoutInflater.from(context)
+            val view = inflater.inflate(R.layout.home_rv_item, null)
+
+            val head = view.findViewById<TextView>(R.id.head)
+            val subhead = view.findViewById<TextView>(R.id.subhead)
+            val image = view.findViewById<ImageView>(R.id.image)
+
+            listOfNotes.forEachIndexed { index, note ->
+
+                head.text = note.title
+                subhead.text = note.description
+                image.setImageBitmap(note.image)
+
+                val pageInfo = PageInfo.Builder(
+                    binding.homeRv.width,
+                    binding.homeRv.height,
+                    index + 1
+                ).create()
+                val page = pdfDocument.startPage(pageInfo)
+
+
+                val bitmap = getBitmapFromView(view)
+                page.canvas.drawBitmap(bitmap!!, 0F, 0F, null)
+                pdfDocument.finishPage(page)
+
+            }
+
             pdfDocument.writeTo(FileOutputStream(filePDFOutput))
             pdfDocument.close()
 
             Toast.makeText(requireContext(), "Pdf saved to downloads folder", Toast.LENGTH_SHORT)
                 .show()
 
-        } catch (e: Exception) {
+
+        }catch (e:Exception){
             println(e.stackTrace)
+
+            Toast.makeText(requireContext(), "Something went wrong", Toast.LENGTH_SHORT)
+                .show()
+
         }
 
+
+
+    }
+
+    private fun getBitmapFromView(view: View): Bitmap? {
+        //Fetch the dimensions of the viewport
+        val displayMetrics = DisplayMetrics()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context?.display?.getRealMetrics(displayMetrics)
+            displayMetrics.densityDpi
+        } else {
+            activity?.windowManager?.defaultDisplay?.getMetrics(displayMetrics)
+        }
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(
+                displayMetrics.widthPixels, View.MeasureSpec.EXACTLY
+            ),
+            View.MeasureSpec.makeMeasureSpec(
+                displayMetrics.heightPixels, View.MeasureSpec.EXACTLY
+            )
+        )
+        view.layout(0, 0, displayMetrics.widthPixels, displayMetrics.heightPixels)
+
+        val returnedBitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(returnedBitmap)
+        val bgDrawable = view.background
+        if (bgDrawable != null) bgDrawable.draw(canvas) else canvas.drawColor(Color.WHITE)
+        view.draw(canvas)
+        return returnedBitmap
     }
 
 
